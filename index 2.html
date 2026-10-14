@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="tr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NeonClip – Videodan Shorts'a</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<meta name="theme-color" content="#07040f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="NeonClip">
+<style>
+:root{--bg:#07040f;--card:#120a24;--c:#00f0ff;--m:#ff2bd6;--g:#9dff00;--t:#eaf2ff}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--t);font-family:system-ui,Segoe UI,sans-serif;
+background-image:linear-gradient(rgba(0,240,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,43,214,.05) 1px,transparent 1px);background-size:44px 44px}
+.wrap{max-width:860px;margin:0 auto;padding:56px 20px}
+h1{font-size:clamp(2.2rem,6vw,3.6rem);margin:0;letter-spacing:-1px}
+h1 span{background:linear-gradient(90deg,var(--c),var(--m));-webkit-background-clip:text;color:transparent;filter:drop-shadow(0 0 18px rgba(0,240,255,.5))}
+p.sub{color:#9aa6c4;margin:.6rem 0 2rem}
+.card{background:var(--card);border:1px solid rgba(0,240,255,.35);border-radius:18px;padding:24px;box-shadow:0 0 30px rgba(0,240,255,.12),inset 0 0 30px rgba(255,43,214,.05)}
+input[type=text]{width:100%;padding:16px;border-radius:12px;border:1px solid var(--c);background:#0a0618;color:var(--t);font-size:1rem;outline:none}
+input[type=text]:focus{box-shadow:0 0 16px var(--c)}
+.row{display:flex;gap:24px;flex-wrap:wrap;margin:20px 0}
+.row label{flex:1;min-width:200px;font-size:.9rem;color:#9aa6c4}
+.row b{color:var(--g)}
+input[type=range]{width:100%;accent-color:var(--m)}
+button.go{width:100%;padding:16px;border:0;border-radius:12px;font-size:1.1rem;font-weight:700;cursor:pointer;color:#07040f;
+background:linear-gradient(90deg,var(--c),var(--m));box-shadow:0 0 24px rgba(255,43,214,.5);transition:.2s}
+button.go:hover{transform:translateY(-2px);box-shadow:0 0 36px var(--c)}
+button.go:disabled{opacity:.5;cursor:wait}
+#prog{display:none;margin-top:24px}
+.bar{height:10px;border-radius:9px;background:#1b1235;overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--c),var(--g));box-shadow:0 0 14px var(--c);transition:width .5s}
+#st{margin-top:10px;color:var(--c)}
+#res{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:18px;margin-top:28px}
+.clip{background:var(--card);border:1px solid var(--m);border-radius:16px;padding:12px;box-shadow:0 0 20px rgba(255,43,214,.25)}
+.clip video{width:100%;aspect-ratio:9/16;border-radius:10px;background:#000}
+.clip small{display:block;margin:8px 0;color:#9aa6c4}.clip small b{color:var(--g)}
+.clip a{display:block;text-align:center;padding:10px;border-radius:10px;border:1px solid var(--c);color:var(--c);text-decoration:none;font-weight:600}
+.clip a:hover{background:var(--c);color:#07040f;box-shadow:0 0 18px var(--c)}
+</style></head>
+<body><div class="wrap">
+<h1>Neon<span>Clip</span></h1>
+<p class="sub">Uzun YouTube videosunu yapıştır, en çok izlenen anlar dikey Shorts olsun.</p>
+<div class="card">
+  <input id="url" type="text" placeholder="https://www.youtube.com/watch?v=...">
+  <div class="row">
+    <label>Short sayısı: <b id="cv">3</b><input id="count" type="range" min="1" max="8" value="3"></label>
+    <label>Süre (sn): <b id="lv">30</b><input id="length" type="range" min="15" max="60" step="5" value="30"></label>
+  </div>
+  <button class="go" id="go">⚡ Shorts Oluştur</button>
+  <div id="prog"><div class="bar"><i id="fill"></i></div><div id="st"></div></div>
+</div>
+<div id="res"></div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+count.oninput=()=>cv.textContent=count.value;length.oninput=()=>lv.textContent=length.value;
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+async function api(path,opt,ms){const c=new AbortController();const t=setTimeout(()=>c.abort(),ms||60000);
+  try{const r=await fetch(path,{...opt,signal:c.signal});if(!r.ok)throw new Error("Sunucu "+r.status);return await r.json()}
+  finally{clearTimeout(t)}}
+function msg(t,bad){st.textContent=t;st.style.color=bad?"#ff4d6d":"var(--c)"}
+go.onclick=async()=>{
+  if(!url.value.trim())return url.focus();
+  go.disabled=true;res.innerHTML="";prog.style.display="block";fill.style.width="0";
+  msg("Sunucuya bağlanılıyor… (ilk açılış 1 dk sürebilir)");
+  try{
+    const {id}=await api("/api/process",{method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({url:url.value.trim(),count:+count.value,length:+length.value})},90000);
+    let fails=0;const t0=Date.now();
+    while(true){
+      await sleep(2000);
+      let j;
+      try{j=await api("/api/status/"+id,{},20000);fails=0}
+      catch(e){if(++fails>=5){msg("Sunucuya ulaşılamıyor. Hafıza dolmuş olabilir, daha kısa bir video dene.",1);break}continue}
+      if(j.error&&j.status==="Bulunamadı"){msg("Sunucu işlemi yarıda kaybetti (hafıza yetersiz olabilir). Daha kısa bir video dene.",1);break}
+      fill.style.width=(j.progress||0)+"%";
+      msg(j.status+" ("+Math.round((Date.now()-t0)/1000)+" sn)",j.error);
+      res.innerHTML=(j.clips||[]).map(c=>`<div class="clip"><video src="${c.file}" controls preload="metadata"></video>
+        <small>${Math.floor(c.start/60)}:${String(c.start%60).padStart(2,"0")} · Viral skor <b>${c.score}</b></small>
+        <a href="${c.file}?dl=1" download>⬇ İndir</a></div>`).join("");
+      if(j.done)break;
+    }
+  }catch(e){msg("Bağlantı hatası: "+(e.name==="AbortError"?"zaman aşımı":e.message),1)}
+  go.disabled=false;
+};
+</script></body></html>
